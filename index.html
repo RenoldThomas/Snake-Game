@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Game | Java Port</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <style>
+        body {
+            background-color: #222;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        canvas {
+            border: 4px solid #0f0;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+        }
+
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+            color: #fff;
+        }
+
+        .key {
+            border: 1px solid #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1 style="margin-bottom: 10px;">SNAKE GAME</h1>
+    <div id="game-container"></div>
+
+    <div class="controls">
+        <p>Controls: <span class="key">ARROWS</span> to Move | <span class="key">SPACE</span> to Pause/Restart</p>
+        <p style="font-size: 0.8em; color: #888;">(Ported from Java to p5.js for Web)</p>
+    </div>
+
+    <script>
+        /**
+         * Port of SnakeGame.java and Snake.java to p5.js
+         */
+
+        const SQUARE_SIZE = 20;
+        const WIDTH = 800;
+        const HEIGHT = 600;
+        const SPEED = 10;
+
+        let snake;
+        let foodList = [];
+        let assets = {};
+        let headImage;
+        let gameOver = false;
+        let paused = false;
+
+        // Preload images (using the paths from your repo)
+        function preload() {
+            assets['head_up'] = loadImage('assets/head_up.png');
+            assets['head_down'] = loadImage('assets/head_down.png');
+            assets['head_left'] = loadImage('assets/head_left.png');
+            assets['head_right'] = loadImage('assets/head_right.png');
+            assets['body'] = loadImage('assets/body.png');
+            assets['apple'] = loadImage('assets/apple.png');
+            assets['cherries'] = loadImage('assets/cherries.png');
+            assets['cookie'] = loadImage('assets/cookie.png');
+        }
+
+        function setup() {
+            let cnv = createCanvas(WIDTH, HEIGHT);
+            cnv.parent('game-container');
+            frameRate(SPEED);
+
+            // Initialize Game
+            restart();
+        }
+
+        function draw() {
+            background(0);
+
+            if (gameOver) {
+                showGameOverScreen();
+                return;
+            }
+
+            if (!paused) {
+                snake.move();
+                checkFoodCollision();
+                if (snake.isColliding()) {
+                    gameOver = true;
+                }
+            }
+
+            // Draw Food
+            for (let f of foodList) {
+                let img = assets[f.icon];
+                if (img) {
+                    image(img, f.x * SQUARE_SIZE, f.y * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE);
+                } else {
+                    // Fallback if image fails to load
+                    fill(255, 0, 0);
+                    rect(f.x * SQUARE_SIZE, f.y * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE);
+                }
+            }
+
+            // Draw Snake Body
+            let current = snake.head.next;
+            while (current != null) {
+                image(assets['body'], current.x * SQUARE_SIZE, current.y * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE);
+                current = current.next;
+            }
+
+            // Draw Snake Head
+            image(headImage, snake.head.x * SQUARE_SIZE, snake.head.y * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE);
+        }
+
+        function keyPressed() {
+            if (keyCode === UP_ARROW) {
+                snake.setDirection(0, -1);
+                headImage = assets['head_up'];
+            } else if (keyCode === DOWN_ARROW) {
+                snake.setDirection(0, 1);
+                headImage = assets['head_down'];
+            } else if (keyCode === LEFT_ARROW) {
+                snake.setDirection(-1, 0);
+                headImage = assets['head_left'];
+            } else if (keyCode === RIGHT_ARROW) {
+                snake.setDirection(1, 0);
+                headImage = assets['head_right'];
+            } else if (key === ' ') {
+                if (gameOver) {
+                    restart();
+                } else {
+                    paused = !paused;
+                }
+            }
+        }
+
+        function restart() {
+            snake = new Snake();
+            headImage = assets['head_right'];
+            gameOver = false;
+            paused = false;
+            foodList = [];
+            spawnFood();
+        }
+
+        function spawnFood() {
+            // Simple random food logic
+            let fx = floor(random(WIDTH / SQUARE_SIZE));
+            let fy = floor(random(HEIGHT / SQUARE_SIZE));
+            // Pick random icon
+            let icons = ['apple', 'cherries', 'cookie'];
+            let icon = random(icons);
+            foodList.push({ x: fx, y: fy, icon: icon });
+        }
+
+        function checkFoodCollision() {
+            for (let i = foodList.length - 1; i >= 0; i--) {
+                let f = foodList[i];
+                if (snake.head.x === f.x && snake.head.y === f.y) {
+                    snake.grow();
+                    foodList.splice(i, 1);
+                    spawnFood();
+                    break;
+                }
+            }
+        }
+
+        function showGameOverScreen() {
+            fill(255);
+            textAlign(CENTER, CENTER);
+            textSize(64);
+            text("Score: " + snake.length, WIDTH / 2, HEIGHT / 2.5);
+            textSize(32);
+            text("Press SPACE to restart", WIDTH / 2, HEIGHT / 1.6);
+        }
+
+        // --- Classes ---
+
+        class Snake {
+            constructor() {
+                this.head = { x: 10, y: 10, next: null };
+                this.dirX = 1;
+                this.dirY = 0;
+                this.shouldGrow = true; // Start growing immediately
+                this.length = 0;
+            }
+
+            setDirection(x, y) {
+                // Prevent 180 turns
+                if (this.dirX !== -x && this.dirY !== -y) {
+                    this.dirX = x;
+                    this.dirY = y;
+                }
+            }
+
+            move() {
+                let newX = this.head.x + this.dirX;
+                let newY = this.head.y + this.dirY;
+
+                // Wrap around
+                let maxX = WIDTH / SQUARE_SIZE;
+                let maxY = HEIGHT / SQUARE_SIZE;
+
+                if (newX < 0) newX = maxX - 1;
+                if (newX >= maxX) newX = 0;
+                if (newY < 0) newY = maxY - 1;
+                if (newY >= maxY) newY = 0;
+
+                // Create new head
+                let newHead = { x: newX, y: newY, next: this.head };
+                this.head = newHead;
+
+                if (!this.shouldGrow) {
+                    this.removeTail();
+                } else {
+                    this.shouldGrow = false;
+                    this.length++;
+                }
+            }
+
+            removeTail() {
+                if (!this.head.next) return;
+                let current = this.head;
+                while (current.next.next != null) {
+                    current = current.next;
+                }
+                current.next = null;
+            }
+
+            grow() {
+                this.shouldGrow = true;
+            }
+
+            isColliding() {
+                let current = this.head.next;
+                while (current != null) {
+                    if (this.head.x === current.x && this.head.y === current.y) {
+                        return true;
+                    }
+                    current = current.next;
+                }
+                return false;
+            }
+        }
+    </script>
+</body>
+
+</html>
