@@ -1,0 +1,26 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "SnakeGame",
+            "request": "launch",
+            "mainClass": "SnakeGame",
+            "projectName": "Snake-Game",
+            "cwd": "${workspaceFolder}/Lab/13",
+            "classPaths": [
+                "${workspaceFolder}/Lab/13/lib/core.jar",
+                "${workspaceFolder}/Lab/13/src"
+            ]
+        },
+        {
+            "type": "java",
+            "name": "Current File",
+            "request": "launch",
+            "mainClass": "${file}"
+        },
+    ]
+}
