@@ -18,12 +18,12 @@
             height: 100vh;
             margin: 0;
             position: relative;
-            /* For absolute positioning of the repo link */
         }
 
         canvas {
             border: 4px solid #0f0;
             box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+            display: block;
         }
 
         .controls {
@@ -39,11 +39,17 @@
             font-weight: bold;
         }
 
-        /* New Repo Button Styles */
-        .repo-link {
+        /* Button Container */
+        .top-buttons {
             position: absolute;
             top: 20px;
             right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Common Button Styles */
+        .nav-btn {
             text-decoration: none;
             color: #222;
             background-color: #0f0;
@@ -52,9 +58,13 @@
             border-radius: 5px;
             transition: all 0.3s ease;
             box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+            border: none;
+            cursor: pointer;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1rem;
         }
 
-        .repo-link:hover {
+        .nav-btn:hover {
             background-color: #fff;
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
             transform: scale(1.05);
@@ -64,13 +74,16 @@
 
 <body>
 
-    <a href="https://github.com/renoldthomas/snake-game" target="_blank" class="repo-link">View Repo on GitHub</a>
+    <div class="top-buttons">
+        <button onclick="restart()" class="nav-btn">↺ Reset Game</button>
+        <a href="https://github.com/renoldthomas/snake-game" target="_blank" class="nav-btn">View Repo</a>
+    </div>
 
     <h1 style="margin-bottom: 10px;">SNAKE GAME</h1>
     <div id="game-container"></div>
 
     <div class="controls">
-        <p>Controls: <span class="key">ARROWS</span> to Move | <span class="key">SPACE</span> to Pause/Restart</p>
+        <p>Controls: <span class="key">ARROWS</span> to Move | <span class="key">SPACE</span> to Pause/Resume</p>
         <p style="font-size: 0.8em; color: #888;">(Ported from Java to p5.js for Web)</p>
     </div>
 
@@ -91,7 +104,6 @@
         let gameOver = false;
         let paused = false;
 
-        // Preload images (using the paths from your repo)
         function preload() {
             assets['head_up'] = loadImage('assets/head_up.png');
             assets['head_down'] = loadImage('assets/head_down.png');
@@ -107,26 +119,47 @@
             let cnv = createCanvas(WIDTH, HEIGHT);
             cnv.parent('game-container');
             frameRate(SPEED);
-
-            // Initialize Game
             restart();
         }
 
         function draw() {
-            background(0);
+            // If paused, just draw the overlay once and stop drawing frame updates
+            if (paused && !gameOver) {
+                // Draw the game frame one last time so we can see the board behind the text
+                drawGameElements();
+
+                // Draw Semi-transparent Overlay
+                fill(0, 0, 0, 150); // Black with transparency
+                rect(0, 0, WIDTH, HEIGHT);
+
+                // Draw "PAUSED" Text
+                fill(255);
+                textAlign(CENTER, CENTER);
+                textSize(80);
+                text("PAUSED", WIDTH / 2, HEIGHT / 2);
+                textSize(20);
+                text("Press SPACE to Resume", WIDTH / 2, HEIGHT / 1.7);
+                return;
+            }
 
             if (gameOver) {
                 showGameOverScreen();
                 return;
             }
 
-            if (!paused) {
-                snake.move();
-                checkFoodCollision();
-                if (snake.isColliding()) {
-                    gameOver = true;
-                }
+            // Normal Game Loop
+            snake.move();
+            checkFoodCollision();
+            if (snake.isColliding()) {
+                gameOver = true;
             }
+
+            drawGameElements();
+        }
+
+        // Separate function to draw board so we can reuse it under the pause screen
+        function drawGameElements() {
+            background(0);
 
             // Draw Food
             for (let f of foodList) {
@@ -134,7 +167,6 @@
                 if (img) {
                     image(img, f.x * SQUARE_SIZE, f.y * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE);
                 } else {
-                    // Fallback if image fails to load
                     fill(255, 0, 0);
                     rect(f.x * SQUARE_SIZE, f.y * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE);
                 }
@@ -152,6 +184,11 @@
         }
 
         function keyPressed() {
+            // Prevent default scrolling behavior for arrows and space
+            if ([32, 37, 38, 39, 40].indexOf(keyCode) > -1) {
+                event.preventDefault();
+            }
+
             if (keyCode === UP_ARROW) {
                 snake.setDirection(0, -1);
                 headImage = assets['head_up'];
@@ -169,6 +206,8 @@
                     restart();
                 } else {
                     paused = !paused;
+                    // If unpausing, ensure loop runs
+                    if (!paused) loop();
                 }
             }
         }
@@ -180,13 +219,12 @@
             paused = false;
             foodList = [];
             spawnFood();
+            loop(); // Ensure draw loop is active
         }
 
         function spawnFood() {
-            // Simple random food logic
             let fx = floor(random(WIDTH / SQUARE_SIZE));
             let fy = floor(random(HEIGHT / SQUARE_SIZE));
-            // Pick random icon
             let icons = ['apple', 'cherries', 'cookie'];
             let icon = random(icons);
             foodList.push({ x: fx, y: fy, icon: icon });
@@ -205,6 +243,7 @@
         }
 
         function showGameOverScreen() {
+            background(0); // Clear screen for clean text
             fill(255);
             textAlign(CENTER, CENTER);
             textSize(64);
@@ -213,19 +252,17 @@
             text("Press SPACE to restart", WIDTH / 2, HEIGHT / 1.6);
         }
 
-        // --- Classes ---
-
+        // --- Snake Class ---
         class Snake {
             constructor() {
                 this.head = { x: 10, y: 10, next: null };
                 this.dirX = 1;
                 this.dirY = 0;
-                this.shouldGrow = true; // Start growing immediately
+                this.shouldGrow = true;
                 this.length = 0;
             }
 
             setDirection(x, y) {
-                // Prevent 180 turns
                 if (this.dirX !== -x && this.dirY !== -y) {
                     this.dirX = x;
                     this.dirY = y;
@@ -236,7 +273,6 @@
                 let newX = this.head.x + this.dirX;
                 let newY = this.head.y + this.dirY;
 
-                // Wrap around
                 let maxX = WIDTH / SQUARE_SIZE;
                 let maxY = HEIGHT / SQUARE_SIZE;
 
@@ -245,7 +281,6 @@
                 if (newY < 0) newY = maxY - 1;
                 if (newY >= maxY) newY = 0;
 
-                // Create new head
                 let newHead = { x: newX, y: newY, next: this.head };
                 this.head = newHead;
 
